@@ -1,0 +1,67 @@
+---
+title: "Toronto Garbage and Recycling Bins Map"
+date: '2017-06-12'
+output: 
+  flexdashboard::flex_dashboard:
+    theme: spacelab
+    social: menu
+    source_code: embed
+---
+
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE, include=FALSE}
+library(foreign)
+library(leaflet)
+library(dplyr)
+library(viridis)
+library(data.table)
+library(tibble)
+
+data <- read.dbf("SWMS_PARK_BIN.dbf")
+data2 <- read.dbf("SWMS_PARK_BIN_WGS84.dbf")
+data3 <- rbind(data,data2)
+View(data3)
+
+data4 <- data.frame(data3$FID, data3$PARK_NAME,data3$LIT_BTYPE,data3$LIT_BCOUNT,data3$REC_BTYPE, data3$REC_BCOUNT,data3$LONGITUDE,data3$LATITUDE)
+data5 <- unique(data4)
+View(data5)
+
+data6 <- rowsum(data5$data3.LIT_BCOUNT,group = data5$data3.PARK_NAME)
+
+flat_lids <- filter(data5,!grepl("Litter Domed Lid Toter",data5$data3.LIT_BTYPE))
+domed_lids <- filter(data5,!grepl("Litter Flat Lid Toter",data5$data3.LIT_BTYPE))
+```
+
+```{r}
+
+flat_lids$flat_lid_pop_up_content <- paste(paste("Park Name: ",flat_lids$data3.PARK_NAME), sep = "<br/>",paste("Bin type:", flat_lids$data3.LIT_BTYPE))
+
+domed_lids$domed_lid_pop_up_content <- paste(paste("Park name:
+",domed_lids$data3.PARK_NAME), sep = "<br/>",paste("Bin type:", domed_lids$data3.LIT_BTYPE))
+
+```
+```{r}
+  
+pal <- colorFactor(c("navy","red"), domain = NULL)
+```
+
+
+```{r,echo=F}
+TO_Garbage_Map <- leaflet(data5) %>% 
+  # Base Groups
+  addProviderTiles(providers$CartoDB.DarkMatter,group = "Dark") %>%
+  addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
+  addProviderTiles(providers$Stamen.TonerLite, group = "Clean") %>%
+  setView(lat=43.769342,lng=-79.412998, zoom = 12) %>% 
+  # Overlay Groups
+  addCircleMarkers(lat=flat_lids$data3.LATITUDE,lng=flat_lids$data3.LONGITUDE, popup = flat_lids$flat_lid_pop_up_content, color=~pal(flat_lids$data3.LIT_BTYPE),fillOpacity = .5,group = "Flat Bins") %>% 
+  addCircleMarkers(lat=domed_lids$data3.LATITUDE,lng=domed_lids$data3.LONGITUDE, popup = domed_lids$domed_lid_pop_up_content, color=~pal(domed_lids$data3.LIT_BTYPE),fillOpacity = .5,group = "Domed") %>% 
+  # Layers Control
+  addLayersControl(
+    baseGroups = c("Dark", "Satellite", "Clean"),
+    overlayGroups = c("Flat Bins","Domed"),
+    options = layersControlOptions(collapsed = FALSE))
+  
+TO_Garbage_Map
+```
+
